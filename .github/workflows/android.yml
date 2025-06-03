@@ -14,77 +14,76 @@ jobs:
     runs-on: ubuntu-latest
 
     env:
-      ORG_GRADLE_JVMARGS: -Xmx4g  # ✅ Increase heap size for Gradle
+      ORG_GRADLE_JVMARGS: -Xmx4g
 
     steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
 
-    # Step 1: Checkout the code
-    - name: Checkout code
-      uses: actions/checkout@v3
+      - name: Install OpenJDK 21
+        run: |
+          sudo apt update
+          sudo apt install -y openjdk-21-jdk
+          java -version
 
-    # Step 2: Install OpenJDK 21
-    - name: Install OpenJDK 21
-      run: |
-        sudo apt update
-        sudo apt install -y openjdk-21-jdk
-        java -version
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
 
-    # Step 3: Install Node.js
-    - name: Set up Node.js
-      uses: actions/setup-node@v3
-      with:
-        node-version: '18' # Match your package.json
+      - name: Install Yarn
+        run: npm install -g yarn
 
-    # Step 4: Install Yarn
-    - name: Install Yarn
-      run: npm install -g yarn
+      - name: Install dependencies
+        run: yarn install
 
-    # Step 5: Install dependencies
-    - name: Install dependencies
-      run: yarn install
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v2
+        with:
+          api-level: 33
+          build-tools: 33.0.2
+          cache: true
 
-    # Step 6: Set up Android SDK
-    - name: Set up Android SDK
-      uses: android-actions/setup-android@v2
-      with:
-        api-level: 33
-        build-tools: 33.0.2
-        cache: true
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+        working-directory: android
 
-    # Step 7: Grant execute permission for gradlew
-    - name: Grant execute permission for gradlew
-      run: chmod +x gradlew
-      working-directory: android
+      - name: Build APK
+        run: ./gradlew assembleRelease
+        working-directory: android
 
-    # Step 8: Build the APK
-    - name: Build APK
-      run: ./gradlew assembleRelease
-      working-directory: android
+      - name: Upload APK to S3 with unique name
+        run: |
+          set -e  # Stop on error
 
-    # Step 9: Upload the APK to S3
-    - name: Upload APK to S3 with unique name
-      run: |
-        DATE_TAG=$(date +%Y%m%d-%H%M%S)
-        FILE_NAME="app-release-$DATE_TAG-${GITHUB_SHA::7}.apk"
+          echo "🔍 Verifying AWS variables:"
+          echo "  AWS_REGION=$AWS_REGION"
+          echo "  S3_BUCKET_NAME=$S3_BUCKET_NAME"
+          echo "  S3_BUCKET_PATH=$S3_BUCKET_PATH"
 
-        # Handle optional path safely
-        if [ -n "$S3_BUCKET_PATH" ]; then
-          S3_URI="s3://$S3_BUCKET_NAME/$S3_BUCKET_PATH/$FILE_NAME"
-          PUBLIC_URL="https://$S3_BUCKET_NAME.s3.$AWS_REGION.amazonaws.com/$S3_BUCKET_PATH/$FILE_NAME"
-        else
-          S3_URI="s3://$S3_BUCKET_NAME/$FILE_NAME"
-          PUBLIC_URL="https://$S3_BUCKET_NAME.s3.$AWS_REGION.amazonaws.com/$FILE_NAME"
-        fi
+          DATE_TAG=$(date +%Y%m%d-%H%M%S)
+          FILE_NAME="app-release-$DATE_TAG-${GITHUB_SHA::7}.apk"
 
-        echo "Uploading to: $S3_URI"
-        aws s3 cp android/app/build/outputs/apk/release/app-release.apk "$S3_URI" \
-          --region "$AWS_REGION" --acl public-read
+          if [ -n "$S3_BUCKET_PATH" ]; then
+            S3_URI="s3://$S3_BUCKET_NAME/$S3_BUCKET_PATH/$FILE_NAME"
+            PUBLIC_URL="https://$S3_BUCKET_NAME.s3.$AWS_REGION.amazonaws.com/$S3_BUCKET_PATH/$FILE_NAME"
+          else
+            S3_URI="s3://$S3_BUCKET_NAME/$FILE_NAME"
+            PUBLIC_URL="https://$S3_BUCKET_NAME.s3.$AWS_REGION.amazonaws.com/$FILE_NAME"
+          fi
 
-        echo "✅ APK uploaded: $PUBLIC_URL"
-        echo "::notice title=Download APK::$PUBLIC_URL"
-      env:
-        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        AWS_REGION: ${{ secrets.AWS_REGION }}
-        S3_BUCKET_NAME: ${{ secrets.S3_BUCKET_NAME }}
-        S3_BUCKET_PATH: ${{ secrets.S3_BUCKET_PATH }}
+          echo "📤 Uploading to: $S3_URI"
+
+          aws s3 cp android/app/build/outputs/apk/release/app-release.apk "$S3_URI" \
+            --region "$AWS_REGION" \
+            --endpoint-url "https://s3.$AWS_REGION.amazonaws.com" \
+            --acl public-read
+
+          echo "✅ APK uploaded: $PUBLIC_URL"
+          echo "::notice title=Download APK::$PUBLIC_URL"
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_REGION: ${{ secrets.AWS_REGION }}
+          S3_BUCKET_NAME: ${{ secrets.S3_BUCKET_NAME }}
+          S3_BUCKET_PATH: ${{ secrets.S3_BUCKET_PATH }}
