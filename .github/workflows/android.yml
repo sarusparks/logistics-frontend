@@ -71,7 +71,7 @@ jobs:
       - name: Ensure APK exists before uploading
         run: |
           if [ ! -f android/app/build/outputs/apk/release/app-release.apk ]; then
-            echo "❌ APK not found!"
+            echo "APK not found!"
             exit 1
           fi
 
@@ -85,7 +85,7 @@ jobs:
           aws s3 cp android/app/build/outputs/apk/release/app-release.apk "$S3_URI" \
             --region "$AWS_REGION" --acl public-read
 
-          echo "✅ APK uploaded: $PUBLIC_URL"
+          echo " APK uploaded: $PUBLIC_URL"
           echo "::notice title=Download APK::$PUBLIC_URL"
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
