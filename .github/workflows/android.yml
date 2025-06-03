@@ -54,7 +54,7 @@ jobs:
 
       - name: Upload APK to S3 with unique name
         run: |
-          set -e  # Stop on error
+          set -e
 
           echo "🔍 Verifying AWS variables:"
           echo "  AWS_REGION=$AWS_REGION"
@@ -76,8 +76,7 @@ jobs:
 
           aws s3 cp android/app/build/outputs/apk/release/app-release.apk "$S3_URI" \
             --region "$AWS_REGION" \
-            --endpoint-url "https://s3.$AWS_REGION.amazonaws.com" \
-            --acl public-read
+            --endpoint-url "https://s3.$AWS_REGION.amazonaws.com"
 
           echo "✅ APK uploaded: $PUBLIC_URL"
           echo "::notice title=Download APK::$PUBLIC_URL"
