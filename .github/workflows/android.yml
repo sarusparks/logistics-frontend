@@ -5,8 +5,7 @@ on:
     branches: [master]
   pull_request:
     branches: [master]
-    
-    
+
 jobs:
   build:
     name: Build Android APK
@@ -69,6 +68,13 @@ jobs:
         run: ./gradlew assembleRelease
         working-directory: android
 
+      - name: Ensure APK exists before uploading
+        run: |
+          if [ ! -f android/app/build/outputs/apk/release/app-release.apk ]; then
+            echo "❌ APK not found!"
+            exit 1
+          fi
+
       - name: Upload APK to S3 with unique name
         run: |
           DATE_TAG=$(date +%Y%m%d-%H%M%S)
@@ -87,3 +93,9 @@ jobs:
           AWS_REGION: ${{ secrets.AWS_REGION }}
           S3_BUCKET_NAME: ${{ secrets.S3_BUCKET_NAME }}
           S3_BUCKET_PATH: ${{ secrets.S3_BUCKET_PATH }}
+
+      - name: Upload APK as GitHub Actions artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-release
+          path: android/app/build/outputs/apk/release/app-release.apk
