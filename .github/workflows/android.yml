@@ -60,10 +60,21 @@ jobs:
       run: ./gradlew assembleRelease
       working-directory: android
 
-    # Step 8: Archive the APK
-    - name: Upload APK
-      uses: actions/upload-artifact@v4
-      with:
-        name: app-release.apk
-        path: android/app/build/outputs/apk/release/app-release.apk
-        retention-days: 1  # ♻️ Auto-delete after 1 day
+	# Step 8: upload the APK
+    - name: Upload APK to S3 with unique name
+      run: |
+        DATE_TAG=$(date +%Y%m%d-%H%M%S)
+        FILE_NAME="app-release-$DATE_TAG-${GITHUB_SHA::7}.apk"
+        S3_URI="s3://$S3_BUCKET_NAME/$FILE_NAME"
+        PUBLIC_URL="https://${S3_BUCKET_NAME}.s3.${AWS_REGION}.amazonaws.com/$FILE_NAME"
+
+        aws s3 cp android/app/build/outputs/apk/release/app-release.apk "$S3_URI" \
+            --region "$AWS_REGION" --acl public-read
+
+        echo "✅ APK uploaded: $PUBLIC_URL"
+        echo "::notice title=Download APK::$PUBLIC_URL"
+      env:
+        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        AWS_REGION: ${{ secrets.AWS_REGION }}
+        S3_BUCKET_NAME: ${{ secrets.S3_BUCKET_NAME }}
