@@ -69,6 +69,7 @@ jobs:
         run: ./gradlew assembleRelease
         working-directory: android
 
+
       - name: Upload APK to S3 with unique name
         run: |
           DATE_TAG=$(date +%Y%m%d-%H%M%S)
